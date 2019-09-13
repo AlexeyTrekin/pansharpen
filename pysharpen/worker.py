@@ -1,11 +1,9 @@
-import sys
+from tqdm import tqdm
 import rasterio
 import numpy as np
-from pathlib import Path
 from rasterio.enums import Resampling
 from rasterio.windows import Window
 
-from methods import Brovey, IHS
 
 class Worker:
     def __init__(self, method,
@@ -35,7 +33,12 @@ class Worker:
             col_off = 0
         return windows
 
-    def process(self, pan_file, ms_file, out_file):
+    @staticmethod
+    def _generate_windows_geo(pan_shape, pan_transform, mul_transform, window_size, overlap=(0, 0)):
+
+        return
+
+    def process(self,  pan_file, ms_file, out_file):
         with rasterio.open(pan_file) as pan:
             profile = pan.profile
             pan_w = pan.width
@@ -55,39 +58,12 @@ class Worker:
                 profile.update(count=mul.count)
                 with rasterio.open(out_file, 'w', **profile) as dst:
                     dst.colorinterp = mul.colorinterp
-                    for mul_window, pan_window in windows:
+                    for mul_window, pan_window in tqdm(windows):
                         pan_tile = pan.read(1, window=pan_window)
-                        for i in range(1, num_channels + 1):
-                            mul_tile = np.zeros((mul.count, pan_tile.shape[0], pan_tile.shape[1]))
-                            mul.read(out=mul_tile, resampling=self.resampling, window=mul_window)
+                        # Read with resampling
+                        mul_tile = np.zeros((mul.count, pan_tile.shape[0], pan_tile.shape[1]), dtype=dtype)
+                        mul.read(out=mul_tile, resampling=self.resampling, window=mul_window)
 
                         result = self.method.sharpen(pan_tile, mul_tile).astype(dtype)
-
                         dst.write(result, window=pan_window)
 
-
-if __name__ == "__main__":
-    """
-    CLI: python worker.py panchrom_name.tif multispectral_name.tif out_name.tif method
-    method = <ihs|brovey>
-    """
-    if len(sys.argv) < 5:
-        print ("Usage: python worker.py panchrom_name.tif multispectral_name.tif out_name.tif <ihs|brovey>")
-        exit(0)
-    pan = Path(sys.argv[1])
-    ms = Path(sys.argv[2])
-    out = Path(sys.argv[3])
-    if sys.argv[4].lower() == 'ihs':
-        method = IHS
-    else:
-        method = Brovey
-
-    if not pan.exists():
-        print("Panchrom file does not exist")
-        exit(0)
-    if not ms.exists():
-        print("MS file does not exist")
-        exit(0)
-
-    try:
-        w = Worker()

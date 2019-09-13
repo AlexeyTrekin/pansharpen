@@ -1,4 +1,4 @@
-from .pansharp import Pansharp
+from pysharpen.methods.pansharp import Pansharp
 import cv2
 
 class Noaction(Pansharp):

@@ -1,4 +1,4 @@
 .idea
-.pysharpen/__pycache__/
-.pysharpen/methods/__pycache__/
-.pysharpen/preprocessing/__pycache__/
+pysharpen/__pycache__/
+pysharpen/methods/__pycache__/
+pysharpen/preprocessing/__pycache__/

@@ -17,8 +17,11 @@ if __name__ == "__main__":
     out = Path(sys.argv[3])
     if sys.argv[4].lower() == 'ihs':
         method = IHS
-    else:
+    elif sys.argv[4].lower() == 'brovey':
         method = Brovey
+    else:
+        print("Method is incorrect")
+        exit(0)
 
     if not pan.exists():
         print("Panchrom file does not exist")
@@ -27,9 +30,10 @@ if __name__ == "__main__":
         print("MS file does not exist")
         exit(0)
 
-    try:
-        w = Worker(method=method)
-    except Exception as e:
-        print('Error in pansharpening')
-        print(str(e))
-        exit(-1)
+    #try:
+    w = Worker(method=method)
+    w.process(pan, ms, out)
+    #except Exception as e:
+     #   print('Error in pansharpening')
+    #    print(str(e))
+     #   exit(-1)

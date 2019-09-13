@@ -19,7 +19,7 @@ def saturate_cast(img, dtype):
     :return: new image of dtype
     """
     if np.issubdtype(dtype, np.integer):
-        return np.clip(img, np.iinfo(dtype).min(), np.iinfo(dtype).max()).astype(dtype)
+        return np.clip(img, np.iinfo(dtype).min, np.iinfo(dtype).max).astype(dtype)
     else:
         return img.astype(dtype)
 
@@ -77,6 +77,7 @@ def cast_meanstd(img, dtype, width=3.0,
 
     res = scale(img, dtype, in_min, in_max, out_min, out_max)
     return res
+
 
 
 def to8bit_meanstd(img16, WIDTH=3):
