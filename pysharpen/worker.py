@@ -1,13 +1,16 @@
+import sys
 import rasterio
 import numpy as np
+from pathlib import Path
 from rasterio.enums import Resampling
 from rasterio.windows import Window
 
+from methods import Brovey, IHS
 
 class Worker:
     def __init__(self, method,
-                 window_size=(2048,2048), padding = (0,0),
-                 resampling = Resampling.bilinear):
+                 window_size=(2048,2048), padding=(0,0),
+                 resampling=Resampling.bilinear):
         self.window_size = window_size
         self.resampling = resampling
         self.padding = padding
@@ -61,3 +64,30 @@ class Worker:
                         result = self.method.sharpen(pan_tile, mul_tile).astype(dtype)
 
                         dst.write(result, window=pan_window)
+
+
+if __name__ == "__main__":
+    """
+    CLI: python worker.py panchrom_name.tif multispectral_name.tif out_name.tif method
+    method = <ihs|brovey>
+    """
+    if len(sys.argv) < 5:
+        print ("Usage: python worker.py panchrom_name.tif multispectral_name.tif out_name.tif <ihs|brovey>")
+        exit(0)
+    pan = Path(sys.argv[1])
+    ms = Path(sys.argv[2])
+    out = Path(sys.argv[3])
+    if sys.argv[4].lower() == 'ihs':
+        method = IHS
+    else:
+        method = Brovey
+
+    if not pan.exists():
+        print("Panchrom file does not exist")
+        exit(0)
+    if not ms.exists():
+        print("MS file does not exist")
+        exit(0)
+
+    try:
+        w = Worker()
