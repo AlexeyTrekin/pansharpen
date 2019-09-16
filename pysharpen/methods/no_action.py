@@ -1,11 +1,10 @@
-from pysharpen.methods.pansharp import Pansharp
-import cv2
+from .pansharp import Pansharp
 
 class Noaction(Pansharp):
 
-    def __init__(self, interp=cv2.INTER_LINEAR):
+    def __init__(self):
         self.count = None
-        self.interp = interp
+        Pansharp.__init__(self)
 
     def setup(self, pan, ms):
         pass
@@ -18,3 +17,4 @@ class Noaction(Pansharp):
         :return: pansharpened image, the same size as pan, but with number of channels as in ms
         """
         return ms
+

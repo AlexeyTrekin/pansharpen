@@ -1,3 +1,4 @@
-cv2
+opencv-python
+tqdm
 numpy>=1.14
 rasterio>=1.0.0
