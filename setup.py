@@ -17,7 +17,7 @@ DESCRIPTION = 'Remote sensing image pansharpening and enhancement.'
 URL = 'https://github.com/AlexeyTrekin/pansharpen'
 EMAIL = 'alexey.trekin@gmail.com'
 AUTHOR = 'Alexey Trekin'
-REQUIRES_PYTHON = '>=3.7.0'
+REQUIRES_PYTHON = '>=3.3.0'
 VERSION = None
 
 # The rest you shouldn't have to touch too much :)
