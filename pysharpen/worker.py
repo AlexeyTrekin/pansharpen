@@ -1,4 +1,3 @@
-from tqdm import tqdm
 import rasterio
 import numpy as np
 from rasterio.enums import Resampling
@@ -49,7 +48,6 @@ class Worker:
                 mul_w = mul.width
                 mul_h = mul.height
                 factor = (pan_w / mul_w, pan_h / mul_h)
-                num_channels = mul.count
 
                 # method may need a setup based on the whole image
                 self.method.setup(pan, mul)
@@ -58,7 +56,7 @@ class Worker:
                 profile.update(count=mul.count)
                 with rasterio.open(out_file, 'w', **profile) as dst:
                     dst.colorinterp = mul.colorinterp
-                    for mul_window, pan_window in tqdm(windows):
+                    for mul_window, pan_window in windows:
                         pan_tile = pan.read(1, window=pan_window)
                         # Read with resampling
                         mul_tile = np.zeros((mul.count, pan_tile.shape[0], pan_tile.shape[1]), dtype=dtype)
