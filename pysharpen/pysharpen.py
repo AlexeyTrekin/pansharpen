@@ -1,10 +1,9 @@
 import sys
-import click
 from pathlib import Path
-from pysharpen.worker import Worker
-from pysharpen.methods import IHS, Brovey
+from .worker import Worker
+from .methods import IHS, Brovey
 
-if __name__ == "__main__":
+def run_cli():
     """
     CLI: python worker.py panchrom_name.tif multispectral_name.tif out_name.tif method
     method = <ihs|brovey>
@@ -37,3 +36,6 @@ if __name__ == "__main__":
      #   print('Error in pansharpening')
     #    print(str(e))
      #   exit(-1)
+
+if __name__ == "__main__":
+    run_cli(sys.argv)

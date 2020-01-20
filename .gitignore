@@ -1,10 +1,10 @@
 .idea
-pysharpen/__pycache__/
-pysharpen/methods/__pycache__/
-pysharpen/preprocessing/__pycache__/
 .eggs
 build/
 dist/
-test/__pycache__/
 pysharpen.egg-info
+tests/__pycache__/
+pysharpen/__pycache__/
+pysharpen/methods/__pycache__/
+pysharpen/preprocessing/__pycache__/
 *.pyc
