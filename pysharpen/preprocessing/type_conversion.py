@@ -73,7 +73,7 @@ def cast_meanstd(img, dtype, width=3.0,
     std = np.std(img)
 
     in_min = max(0., mean - width * std)
-    in_max = min(img.max, mean + width * std)
+    in_max = min(img.max(), mean + width * std)
 
     res = scale(img, dtype, in_min, in_max, out_min, out_max)
     return res
@@ -91,7 +91,7 @@ def to8bit_meanstd(img16, WIDTH=3):
     std = np.std(img16)
 
     m = max(0, mean - WIDTH * std)
-    M = min(img16.max, mean + WIDTH * std)
+    M = min(img16.max(), mean + WIDTH * std)
 
     img8 = ((img16 - m) * 255.0 / (M - m)).clip(1, 255).astype(np.uint8)
     return img8
@@ -109,7 +109,7 @@ def to8bit_clip(img16, percent=0.1):
     V = data.shape[0] / channels
     dv = V * percent / 100
 
-    hist = np.histogram(data, bins=data.max - data.min)[0]
+    hist = np.histogram(data, bins=data.max() - data.min())[0]
 
     tail = 0
     m = 0
@@ -118,7 +118,7 @@ def to8bit_clip(img16, percent=0.1):
         m += 1
 
     tail = 0
-    M = data.max - data.min - 1
+    M = data.max() - data.min() - 1
     while tail < dv:
         tail += hist[M]
         M -= 1
