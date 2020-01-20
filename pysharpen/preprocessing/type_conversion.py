@@ -54,7 +54,7 @@ def scale(img, dtype,
     if np.issubdtype(dtype, np.integer):
         if out_min is None:
             out_min = np.iinfo(dtype).min
-        if in_max is None:
+        if out_max is None:
             out_max = np.iinfo(dtype).max
     # default range for float is 0:1
     else:
