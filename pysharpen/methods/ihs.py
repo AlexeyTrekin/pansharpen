@@ -8,6 +8,7 @@ class IHS(Pansharp):
 
     def __init__(self):
         Pansharp.__init__(self)
+        self.ready = True
 
     def sharpen(self, pan, ms):
         """

@@ -5,9 +5,7 @@ class Noaction(Pansharp):
     def __init__(self):
         self.count = None
         Pansharp.__init__(self)
-
-    def setup(self, pan, ms):
-        pass
+        self.ready = True
 
     def sharpen(self, pan, ms):
         """

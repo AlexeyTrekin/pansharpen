@@ -10,7 +10,7 @@ class Brovey(Pansharp):
         """
         :param weights:
         """
-
+        Pansharp.__init__(self)
         self.weights = None
 
         if weights is not None:
@@ -19,7 +19,9 @@ class Brovey(Pansharp):
             self.weights = weights / sum(weights)
         else:
             self.weights = 1
-        Pansharp.__init__(self)
+        #The method does not require setup, so we set it ready at once
+        self.ready = True
+
 
     def _calculate_ratio(self, pan, ms):
         return pan / (np.sum(ms * self.weights, 0))
