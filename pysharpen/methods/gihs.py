@@ -4,10 +4,14 @@ from pysharpen.preprocessing.type_conversion import saturate_cast, wider_type
 
 
 class GIHS(Pansharp):
+    """
+    Generalized IHS-like transform for any number of channels.
+    Formula for the output is: MSpan[i] = MS[i] + pan - mean (MS)
+    Similar to Brovey, but additive rather than multiplicative
+    """
 
     def __init__(self):
         Pansharp.__init__(self)
-        self.ready=True
 
     def sharpen(self, pan, ms):
         """

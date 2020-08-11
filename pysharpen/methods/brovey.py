@@ -5,6 +5,11 @@ from pysharpen.preprocessing.type_conversion import saturate_cast
 
 
 class Brovey(Pansharp):
+    """
+    Brovey transform for pansharpening.
+    Formula for the output is: MSpan[i] = MS[i] * pan / mean (MS)
+    Mean is weighted, default weights are equal.
+    """
 
     def __init__(self, weights=None):
         """
@@ -20,7 +25,6 @@ class Brovey(Pansharp):
         else:
             self.weights = 1
         #The method does not require setup, so we set it ready at once
-        self.ready = True
 
 
     def _calculate_ratio(self, pan, ms):

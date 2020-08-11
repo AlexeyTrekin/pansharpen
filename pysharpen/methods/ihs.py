@@ -5,18 +5,25 @@ from pysharpen.preprocessing.type_conversion import saturate_cast, wider_type
 
 
 class IHS(Pansharp):
+    """
+     IHS pansharpening is for RGB image only. It transforms RGB into IHS color space,
+     then replaces Intensity with PAN channel and transforms backwards. Based on OpenCV color transforms
+    """
 
     def __init__(self):
         Pansharp.__init__(self)
-        self.ready = True
 
     def sharpen(self, pan, ms):
+
         """
-        :param pan:
-        :param ms:
-        :return:
+
+        Args:
+            pan: panchromatic image, 2-dimensional numpy array
+            ms: multispectral image, 3-dimensional numpy array, channels-first (rasterio format), as read in worker
+
+        Returns:
+            pansharpened image, the same size as pan, but with number of channels as in ms, with IHS method
         """
-        # The methods expect already resized images
 
         assert pan.shape == ms.shape[1:], 'Shapes of multispectral and panchrom are different'
         assert ms.shape[0] == 3, 'IHS pansharpening is restricted to 3 channels, use GIHS for others'
