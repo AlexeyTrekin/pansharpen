@@ -1,43 +1,83 @@
+import os
 import rasterio
 import numpy as np
+import aeronet.dataset as ds
+from aeronet.converters.split import split
+
 from rasterio.enums import Resampling
 from rasterio.windows import Window
+from methods import Panshrp
 
 
 class Worker:
-    def __init__(self, method,
-                 window_size=(2048,2048), padding=(0,0),
+    def __init__(self, method:Panshrp,
+                 window_size=(2048,2048), bound=0,
                  resampling=Resampling.bilinear):
         self.window_size = window_size
         self.resampling = resampling
-        self.padding = padding
+        self.bound = bound
         self.method = method()
 
-    @staticmethod
-    def _generate_windows(imsize, window_size, factor, overlap=(0, 0)):
-        full_ms = Window(0, 0, imsize[0] / factor[0], imsize[1] / factor[1])
-        full_pan = Window(0, 0, imsize[0], imsize[1])
-        windows = []
-        col_off = 0
-        row_off = 0
-        m_width = window_size[0] / factor[0]
-        m_height = window_size[1] / factor[1]
-        while row_off < imsize[1]:
-            while col_off < imsize[0]:
-                pan_window = Window(col_off, row_off, window_size[0], window_size[1]).intersection(full_pan)
-                mul_window = Window(col_off / factor[0], row_off / factor[1], m_width, m_height).intersection(full_ms)
-                windows.append((mul_window, pan_window))
-                col_off += window_size[0] - overlap[0]
-            row_off += window_size[1] - overlap[1]
-            col_off = 0
-        return windows
+    def process_separate(self, input_dir, output_dir, pan_channel='PAN', mul_channels=None,
+                         extensions=('tif', 'tiff', 'TIF', 'TIFF')):
 
-    @staticmethod
-    def _generate_windows_geo(pan_shape, pan_transform, mul_transform, window_size, overlap=(0, 0)):
+        if mul_channels is None:
+            mul_channels = ['RED', 'GRN', 'BLU']
 
-        return
+        input_channels = mul_channels + [pan_label]
+        # We call pansharpened channel with 'P' prefix, like pansharpen RED is PRED
+        output_labels = ['P' + channel for channel in input_channels]
+        pan_band = ds.Band(pan_channel)
 
-    def process(self,  pan_file, ms_file, out_file):
+        # A single band collection is necessary for the Predictor
+        # reproject_to provides geographic matching of pan and mul images
+        pan_band = ds.Band(ds.parse_directory(input_dir, [pan_channel], extensions)[0])
+        mul_bands = ds.BandCollection(ds.parse_directory(input_dir, mul_channels, extensions))
+
+        # Or should we do it after reprojection?
+        if not self.method.ready:
+            self.method.setup(pan_band, mul_bands)
+
+        all_bands = mul_bands.reproject_to(pan_band, interpolation=self.resampling).append(pan_band)
+
+        pred = ds.Predictor(input_channels, output_labels, self.method.get_sharpen_fn(),
+                            sample_size=self.window_size, bound=self.bound, verbose=False)
+
+        pred.process(all_bands, output_dir)
+
+    def process_single(self, pan_file, ms_file, out_file, channels=None, clean=True):
+        folder = os.path.dirname(ms_file)
+        pan_band = ds.Band(pan_file)
+
+        with rasterio.open(ms_file) as src:
+            ms_profile = src.profile
+
+        if channels is None:
+            channels = ['B' + str(i).zfill(2) for i in range(ms_profile.count)]
+        mul_bands = split(ms_file, folder, channels)
+
+        if not self.method.ready:
+            self.method.setup(pan_band, mul_bands)
+
+        all_bands = mul_bands.reproject_to(pan_band, interpolation=self.resampling).append(pan_band)
+
+        pred = ds.Predictor(input_channels, output_labels, self.method.get_sharpen_fn(),
+                            sample_size=self.window_size, bound=self.bound, verbose=False)
+
+        out_bc = pred.process(all_bands, output_dir)
+
+        profile = pan_band.profile
+        profile.update(count = mul_bands.count)
+        # We want to merge the channels back into one file as it was
+        with rasterio.open(out_file, 'w', **profile) as dst:
+            dst.write(out_bc.numpy())
+
+        if clean:
+            for band, pband in zip(mul_bands, out_bc):
+                os.remove(band._band.name)
+                os.remove(pband._band.name)
+
+    def process(self, pan_file, ms_file, out_file):
         with rasterio.open(pan_file) as pan:
             profile = pan.profile
             pan_w = pan.width
