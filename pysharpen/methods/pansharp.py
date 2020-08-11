@@ -70,12 +70,12 @@ class Pansharp:
                              'Please call method.setup() for the input image')
 
         def fn(collection: BandCollectionSample):
-            if isinstance(collection._samples, list) and len(collection) <= 1:
-                pan = collection[0].numpy()
-                ms = [sample.numpy() for sample in collection[1:]]
+            if collection.count > 1:
+                pan = collection[-1].numpy()
+                ms = [sample.numpy() for sample in collection[:-1]]
             else:
-                raise ValueError('The samples inside the collection must be a list with 2 or more channels (PAN + MS)')
-
+                raise ValueError('The samples inside the collection must be a list '
+                                 'with 2 or more channels where PAN channel is the last')
             return self.sharpen(pan, ms)
 
         return fn
