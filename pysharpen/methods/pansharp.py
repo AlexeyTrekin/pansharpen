@@ -71,8 +71,10 @@ class Pansharp:
 
         def fn(collection: BandCollectionSample):
             if collection.count > 1:
-                pan = collection[-1].numpy()
-                ms = [sample.numpy() for sample in collection[:-1]]
+                img = collection.numpy()
+                print(img.shape)
+                pan = img[-1]
+                ms = img[:-1]
             else:
                 raise ValueError('The samples inside the collection must be a list '
                                  'with 2 or more channels where PAN channel is the last')

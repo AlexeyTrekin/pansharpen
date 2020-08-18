@@ -1,4 +1,4 @@
-from .pansharp import Pansharp
+from pansharp import Pansharp
 
 
 class Noaction(Pansharp):
