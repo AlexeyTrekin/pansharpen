@@ -1,22 +1,17 @@
 import os
 import rasterio
-import numpy as np
 import aeronet.dataset as ds
 from aeronet.converters.split import split
-
-from rasterio.enums import Resampling
-from rasterio.windows import Window
 
 
 class Worker:
     def __init__(self, method,
-                 window_size=(2048,2048), bound=0,
-                 resampling=Resampling.bilinear):
+                 window_size=(2048, 2048), bound=0,
+                 resampling='bilinear'):
         self.window_size = window_size
         self.resampling = resampling
         self.bound = bound
         self.method = method()
-
         
     def process_separate(self, input_dir, output_dir, pan_channel='PAN', mul_channels=None,
                          extensions=('tif', 'tiff', 'TIF', 'TIFF')):
@@ -43,7 +38,6 @@ class Worker:
 
         pred.process(all_bands, output_dir)
 
-        
     def process_single(self, pan_file, ms_file, out_file, channels=None, clean=True):
         folder = os.path.dirname(ms_file)
         pan_band = ds.Band(pan_file)
