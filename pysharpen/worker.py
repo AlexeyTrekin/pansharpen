@@ -25,7 +25,6 @@ class Worker:
         def processing_fn(collection):
             if collection.count > 1:
                 img = collection.numpy()
-                print(img.shape)
                 pan = img[-1]
                 ms = img[:-1]
             else:
@@ -33,7 +32,7 @@ class Worker:
                                  'with 2 or more channels where PAN channel is the last')
             for m in self.methods:
                 pan, ms = m.process(pan, ms)
-
+            return ms
         self.processing_fn = processing_fn
 
     def setup_methods(self, bc, channels):
@@ -61,10 +60,9 @@ class Worker:
                 m.finalize_setup()
 
     def process(self, bc, channels, output_labels, output_dir):
-
         return ds.Predictor(channels, output_labels, self.processing_fn,
                             sample_size=self.window_size, bound=self.bound,
-                            verbose=False, dtype=channels[-1].dtype)\
+                            verbose=True, dtype=bc[-1].dtype)\
             .process(bc, output_dir)
 
     def process_separate(self, input_dir, output_dir, pan_channel='PAN', mul_channels=None,
@@ -120,8 +118,9 @@ class Worker:
         # We want to merge the channels back into one file as it was
         # It requires reading full files, so it's not memory-efficient
         # However, just the read-write operations will not consume more than the image size
-        for band_num, band in enumerate(out_bc):
-            with rasterio.open(out_file, 'w', **pan_profile) as dst:
+        with rasterio.open(out_file, 'w', **pan_profile) as dst:
+            for band_num, band in enumerate(out_bc):
+                print(band.numpy().shape)
                 dst.write(band.numpy(), band_num + 1)
 
         if clean:

@@ -16,17 +16,17 @@ class IHSPansharpening(ImgProc):
         self._mins = []
         self._maxs = []
         self._min_value = 0
-        self._max_value = 1
+        self._max_value = 255
 
         self.setup_required = True
 
     def setup_from_patch(self, pan, ms, nodata=None):
         if pan.dtype == ms.dtype == np.uint8:
             return
-        self.nodata = nodata
-        if nodata is not None:
-            pan = MaskedArray(pan, (pan == nodata), fill_value=nodata)
-            ms = MaskedArray(pan, (ms == nodata), fill_value=nodata)
+        #self.nodata = nodata
+        #if nodata is not None:
+        #    pan = MaskedArray(pan, (pan == nodata), fill_value=nodata)
+        #    ms = MaskedArray(pan, (ms == nodata), fill_value=nodata)
         self._mins.append(min(pan.min(), ms.min()))
         self._maxs.append(max(pan.max(), ms.max()))
 
@@ -55,9 +55,13 @@ class IHSPansharpening(ImgProc):
             pansharpened image, the same size as pan, but with number of channels as in ms, with IHS method
         """
 
-        assert pan.shape == ms.shape[1:], 'Shapes of multispectral and panchrom are different'
-        assert ms.shape[0] == 3, 'IHS pansharpening is restricted to 3 channels, use GIHS for others'
-        assert ms.dtype == pan.dtype, f'Data types of multispectral {ms.dtype} and panchrom {pan.dtype} are different'
+        if pan.shape != ms.shape[1:]:
+            raise ValueError('Shapes of multispectral and panchrom are different')
+        if ms.shape[0] != 3:
+            raise ValueError('IHS pansharpening is restricted to 3 channels, use GIHS for others')
+        if ms.dtype != pan.dtype:
+            raise ValueError(f'Data types of multispectral {ms.dtype} and panchrom {pan.dtype} are different')
+
         dtype = pan.dtype
         ms = ms.transpose(1, 2, 0)
 
@@ -70,18 +74,14 @@ class IHSPansharpening(ImgProc):
             if self._min_value == self._max_value:
                 # if one of the images is constant, we do nothing
                 return pan, ms
-
             ms = linear_brightness_scale(ms, self._min_value, self._max_value, dtype=np.float32)
-            pan = linear_brightness_scale(ms, self._min_value, self._max_value, dtype=np.float32)
-                
+            pan = linear_brightness_scale(pan, self._min_value, self._max_value, dtype=np.float32)
         hsv = cv2.cvtColor(ms, cv2.COLOR_RGB2HSV)
         hue = hsv[:, :, 0]
         saturation = hsv[:, :, 1]
         HSpan = np.array([hue, saturation, pan]).transpose(1, 2, 0)
         RGBpan = cv2.cvtColor(HSpan, cv2.COLOR_HSV2RGB)
-
         if not (dtype == np.uint8 or dtype == np.float32):
             RGBpan = linear_brightness_scale(RGBpan, 0, 1, dtype=dtype,
                                              out_range=(self._min_value, self._max_value))
-
         return pan, RGBpan.transpose(2, 0, 1)

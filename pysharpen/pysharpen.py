@@ -1,7 +1,7 @@
 import sys
 from pathlib import Path
 from .worker import Worker
-from .methods import IHS, Brovey, GIHS
+from pysharpen.methods import BroveyPansharpening, IHSPansharpening, GIHSPansharpening
 
 def run_cli():
     """
@@ -16,19 +16,20 @@ def run_cli():
     out = sys.argv[3]
     
     if len(sys.argv) == 4:
-        method = IHS
+        method = IHSPansharpening()
     else:
         if sys.argv[4].lower() == 'ihs':
-            method = IHS
+            method = IHSPansharpening()
         elif sys.argv[4].lower() == 'brovey':
-            method = Brovey
+            method = BroveyPansharpening()
         elif sys.argv[4].lower() == 'gihs':
-            method = GIHS
+            method = GIHSPansharpening()
         else:
+            method = None
             print("Method is incorrect")
             exit(0)
             
-    if len(sys.argv) == 5:
+    if len(sys.argv) <= 5:
         resampling = 'bilinear'
     else:
         resampling = sys.argv[5]
@@ -41,8 +42,8 @@ def run_cli():
         exit(0)
 
     #try:
-    w = Worker(method=method, resampling=resampling)
-    w.process_single(pan, ms, out)
+    w = Worker(methods=[method], resampling=resampling)
+    w.process_single(pan, ms, out, clean=False)
     #except Exception as e:
      #   print('Error in pansharpening')
     #    print(str(e))

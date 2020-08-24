@@ -23,9 +23,10 @@ def linear_brightness_scale(img, input_min, input_max,
     :param out_range:
     :return:
     """
-
+    if dtype is None:
+        dtype = img.dtype
     if out_range is None:
-        out_range = value_range(img.dtype)
+        out_range = value_range(dtype)
 
     if input_max < input_min or out_range[0] > out_range[1]:
         raise ValueError('Maximum value of must not be less than minimum')
@@ -38,8 +39,6 @@ def linear_brightness_scale(img, input_min, input_max,
         img_float = (img.astype('float32')-input_min)/(input_max-input_min)
     else:
         img_float = (img - input_min) / (input_max - input_min)
-    if dtype is None:
-        dtype = img.dtype
     return saturate_cast(img_float*(out_range[1] - out_range[0]) + out_range[0], dtype)
 
 
