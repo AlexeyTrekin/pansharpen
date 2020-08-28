@@ -3,10 +3,10 @@ from aeronet.dataset import BandCollectionSample
 
 class ImgProc:
     def __init__(self):
-        self.setup_required=False
+        self.setup_required = False
         self.nodata = None
 
-    def setup_from_patch(self, pan, ms, nodata=None):
+    def setup_from_patch(self, pan, ms):
         return
 
     def finalize_setup(self):
@@ -42,9 +42,17 @@ class ImgProc:
         return fn
 
     @property
-    def bound(self):
+    def processing_bound(self):
         """
         required bound for this processing
+        :return:
+        """
+        return 0
+
+    @property
+    def setup_bound(self):
+        """
+        required bound for setup of this function
         :return:
         """
         return 0

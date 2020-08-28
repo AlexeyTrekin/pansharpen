@@ -2,6 +2,7 @@ import numpy as np
 import warnings
 from .dtype_utils import value_range, saturate_cast
 
+from numpy import float32 as default_dtype
 """
 The purpose of these methods is to scale the image values to enhance the image brightness.
 
@@ -34,17 +35,35 @@ def linear_brightness_scale(img, input_min, input_max,
         warnings.warn('Minimum and maximum value of the initial range are equal, scaling is undetermined, '
                       'returning array of minimum value of out range')
         return np.ones_like(img)*img.dtype(out_range[0])
+
     #  We use float32 inside to avoid loss of data for the integer values
     if np.issubdtype(img.dtype, np.integer):
-        img_float = (img.astype('float32')-input_min)/(input_max-input_min)
+        img_float = (img.astype(default_dtype)-input_min)/(input_max-input_min)
     else:
         img_float = (img - input_min) / (input_max - input_min)
     return saturate_cast(img_float*(out_range[1] - out_range[0]) + out_range[0], dtype)
 
 
-def gamma_correction(img, gamma):
-    return img
+def gamma_correction(img, gamma, input_min=0, input_max=None, dtype=None):
+    """
+    Gamma-correction, non-linear brightness shift
+    Args:
+        img: input image
+        gamma: the 1/power of the transform
+        input_min: this value remains constant, and all lower values are clipped
+        input_max: this value remains constant, and all higher values are clipped
+        dtype: output data type. The same as input by default
+    Returns:
+
+    """
+    if dtype is None:
+        dtype = img.dtype
+    if input_max is None:
+        input_max = img.max()
+
+    # gamma is ill-defined out of the range
+    img = img.clip(input_min, input_max).astype(default_dtype)
+
+    return saturate_cast((img / input_max-input_min) ^ (1 / gamma) * input_max + input_min, dtype)
 
 
-def retinex(img, sigma):
-    return img

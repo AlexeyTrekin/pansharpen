@@ -3,6 +3,7 @@ from pathlib import Path
 from .worker import Worker
 from pysharpen.methods import BroveyPansharpening, IHSPansharpening, GIHSPansharpening
 
+
 def run_cli():
     """
     CLI: python worker.py panchrom_name.tif multispectral_name.tif out_name.tif method
