@@ -13,7 +13,7 @@ class LinearBrightnessScale(ImgProc):
     def __init__(self, method='minmax', dtype=None,
                  per_channel=False, pan_separate=False,
                  process_pan=True, process_ms=True,
-                 std_width=3.0,
+                 std_width=3.0, hist_cut = 0.05,
                  **kwargs):
         """
 
@@ -26,33 +26,34 @@ class LinearBrightnessScale(ImgProc):
             process_ms: can be disabled if not necessary to speed up
         """
         super().__init__()
-        self.method = method
-        self.dtype = dtype
-        self.process_pan = process_pan
-        self.process_ms = process_ms
+        self._method = method
+        self._dtype = dtype
+        self._process_pan = process_pan
+        self._process_ms = process_ms
 
-        self.per_channel = per_channel
+        self._per_channel = per_channel
         # if ms is scaled per-channel, we cannot scale pan together with all the channels
-        self.pan_separate = pan_separate or per_channel
-        #Valid only for method = 'meanstd'
-        self.std_width = std_width
+        self._pan_separate = pan_separate or per_channel
+        # Valid only for method = 'meanstd'
+        self._std_width = std_width
+        # Valid only for method = 'histogram'
+        self._hist_cut = hist_cut
 
+        # ============ total image statistics used for calculations ===========#
+        self._pan_min_value = 0
+        self._pan_max_value = 1
+        self._ms_min_value = [] if self._per_channel else 0
+        self._ms_min_value = [] if self._per_channel else 1
+        # ================ temp storage for image statistics ================ #
         # separate pan mins and maxs for pan and ms
         self._pan_mins = []
         self._pan_maxs = []
-        self._pan_min_value = 0
-        self._pan_max_value = 255
+
         # ms mins and maxs - numeric if not self.per_channel and list else
         self._ms_mins = []
         self._ms_maxs = []
-        if self.per_channel:
-            self._ms_min_vector = []
-            self._ms_max_vector = []
-        else:
-            self._ms_min_value = 0
-            self._ms_max_value = 255
 
-        # intermediate values for the mean-std variant
+        # mean, std and mean error
         self._pan_means = []
         self._pan_stds = []
         self._pan_mes = []
@@ -60,24 +61,43 @@ class LinearBrightnessScale(ImgProc):
 
         self._ms_means = []
         self._ms_stds = []
-        self._ms_mes = []
         self._ms_nums = []
+        self._ms_mes = []
 
+
+        # histogram
+        self._pan_hist = []
+        self._ms_hist = []
         self.setup_required = True
+
+    def __repr__(self):
+        repr = f'LinearBrightnessScale(method: {self._method}, ' \
+               f'pan_separate: {self._pan_separate}, per_channel: {self._per_channel}, ' \
+               f'process_pan: {self._process_pan}, process_ms: {self._process_ms})'
+        if self._method == 'meanstd':
+            repr = repr + f', width: {self._std_width}'
+        elif self._method == 'historgam':
+            repr = repr + f', {self._hist_cut}'
 
     def setup_from_patch(self, pan, ms):
         # we do not setup it for unit32 as the range is 0:255 and well defined
         if pan.dtype == ms.dtype == np.uint8:
             return
-        if self.method == 'minmax':
+        if self._method == 'minmax':
             self._minmax_from_patch(pan, ms)
 
     def finalize_setup(self):
         """
             Claculates total min and max for the pan and ms values from accumulated windowed min and max
         """
-        if self.method == 'minmax':
+        if self._method == 'minmax':
             self._finalize_minmax()
+        elif self._method == 'meanstd':
+            self._finalize_meanstd()
+        elif self._method == 'historgam':
+            self._finalize_histogram()
+        else:
+            raise ValueError(f'Unknown method {self._method}')
 
     def process(self, pan, ms):
         """
@@ -89,16 +109,16 @@ class LinearBrightnessScale(ImgProc):
             pansharpened image, the same size as pan, but with number of channels as in ms, with IHS method
         """
 
-        dtype = self.dtype if self.dtype is not None else pan.dtype
-        if self.process_pan:
+        dtype = self._dtype if self._dtype is not None else pan.dtype
+        if self._process_pan:
             pan = linear_brightness_scale(pan,
                                           self._pan_min_value, self._pan_max_value,
                                           dtype=dtype)
-        if self.process_ms:
-            if self.per_channel:
+        if self._process_ms:
+            if self._per_channel:
                 for channel in range(ms.shape[0]):
                     ms[channel] = linear_brightness_scale(ms[channel],
-                                                          self._ms_min_vector[channel], self._ms_max_vector[channel],
+                                                          self._ms_min_value[channel], self._ms_max_value[channel],
                                                           dtype=dtype)
             else:
                 ms = linear_brightness_scale(ms,
@@ -111,7 +131,7 @@ class LinearBrightnessScale(ImgProc):
     # find minimum and maximum value of the whole image
     def _minmax_from_patch(self, pan, ms):
 
-        if not self.pan_separate:
+        if not self._pan_separate:
             local_min = min(pan.min(), ms.min())
             local_max = max(pan.max(), ms.max())
             self._pan_mins.append(local_min)
@@ -122,7 +142,7 @@ class LinearBrightnessScale(ImgProc):
             self._pan_mins.append(pan.min())
             self._pan_maxs.append(pan.max())
 
-            if self.per_channel:
+            if self._per_channel:
                 local_min = []
                 local_max = []
                 for channel in ms:
@@ -141,13 +161,24 @@ class LinearBrightnessScale(ImgProc):
             # TODO: manage the default values?
         self._pan_min_value = np.min(self._pan_mins)
         self._pan_max_value = np.max(self._pan_maxs)
-        if self.per_channel:
+        if self._per_channel:
             self._ms_min_vector = np.min(self._ms_mins, axis=0)
             self._ms_min_vector = np.max(self._ms_maxs, axis=0)
         else:
             self._ms_min_value = np.min(self._ms_mins)
             self._ms_max_value = np.max(self._ms_maxs)
 
+        # Clear the statistics accumulators
+        # separate pan mins and maxs for pan and ms
+        self._pan_mins = []
+        self._pan_maxs = []
+
+        # ms mins and maxs - numeric if not self.per_channel and list else
+        self._ms_mins = []
+        self._ms_maxs = []
+
+
+    # ================== Histogram method ========================= #
     # Find minimum and maximum from histogram
     def _histogram_from_patch(self, pan, ms):
         return
@@ -155,6 +186,7 @@ class LinearBrightnessScale(ImgProc):
     def _finalize_histogram(self):
         return
 
+    # ======================= Meanstd method ======================== #
     # Find maximum and minimum as mean +- N*std
     def _meanstdme(self, img, axis=None):
         mean = img.mean(axis)
@@ -177,7 +209,7 @@ class LinearBrightnessScale(ImgProc):
         # We also need min and max values if we use meanstd
         self._minmax_from_patch(pan, ms)
 
-        if not self.pan_separate:
+        if not self._pan_separate:
             mean, std, num, me = self._meanstdme(np.concatenate(ms, pan, axis=0))
             self._pan_means.append(mean)
             self._pan_stds.append(std)
@@ -195,7 +227,7 @@ class LinearBrightnessScale(ImgProc):
             self._pan_mes.append(me)
             self._pan_nums.append(num)
 
-            axis = 1 if self.per_channel else None
+            axis = 1 if self._per_channel else None
             mean, std, num, me = self._meanstdme(ms, axis=axis)
             self._ms_means.append(mean)
             self._ms_stds.append(std)
@@ -216,9 +248,30 @@ class LinearBrightnessScale(ImgProc):
 
         # Then we make the min higher and the max lower if it is necessary
         # Maybe not use minmax, and just clip to the value range?
-        axis = 1 if self.per_channel else None
-        self._pan_min_value = max(pan_mean - self.std_width*pan_std, self._pan_min_value)
-        self._ms_min_value = np.max([ms_mean - self.std_width*ms_std, self._ms_min_value], axis=axis)
-        self._pan_max_value = min(pan_mean + self.std_width*pan_std, self._pan_max_value)
-        self._ms_max_value = np.min([ms_mean + self.std_width*ms_std,self._ms_max_value], axis=axis )
+        axis = 1 if self._per_channel else None
+        self._pan_min_value = max(pan_mean - self._std_width * pan_std, self._pan_min_value)
+        self._ms_min_value = np.max([ms_mean - self._std_width * ms_std, self._ms_min_value], axis=axis)
+        self._pan_max_value = min(pan_mean + self._std_width * pan_std, self._pan_max_value)
+        self._ms_max_value = np.min([ms_mean + self._std_width * ms_std, self._ms_max_value], axis=axis)
+
+        # Clear the statistics accumulators
+        # separate pan mins and maxs for pan and ms
+        self._pan_mins = []
+        self._pan_maxs = []
+
+        # ms mins and maxs - numeric if not self.per_channel and list else
+        self._ms_mins = []
+        self._ms_maxs = []
+
+        # mean, std and mean error
+        self._pan_means = []
+        self._pan_stds = []
+        self._pan_mes = []
+        self._pan_nums = []
+
+        self._ms_means = []
+        self._ms_stds = []
+        self._ms_nums = []
+        self._ms_mes = []
+
 
