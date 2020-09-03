@@ -13,8 +13,7 @@ class LinearBrightnessScale(ImgProc):
     def __init__(self, method='minmax', dtype=None,
                  per_channel=False, pan_separate=False,
                  process_pan=True, process_ms=True,
-                 std_width=3.0, hist_cut = 0.05,
-                 **kwargs):
+                 std_width=3.0, hist_cut=0.05):
         """
 
         Args:
@@ -85,6 +84,12 @@ class LinearBrightnessScale(ImgProc):
             return
         if self._method == 'minmax':
             self._minmax_from_patch(pan, ms)
+        elif self._method == 'meanstd':
+            self._meanstd_from_patch(pan, ms)
+        elif self._method == 'historgam':
+            self._histogram_from_patch(pan, ms)
+        else:
+            raise ValueError(f'Unknown method {self._method}')
 
     def finalize_setup(self):
         """
@@ -135,7 +140,7 @@ class LinearBrightnessScale(ImgProc):
             local_min = min(pan.min(), ms.min())
             local_max = max(pan.max(), ms.max())
             self._pan_mins.append(local_min)
-            self._pan_mins.append(local_max)
+            self._pan_maxs.append(local_max)
             self._ms_mins.append(local_min)
             self._ms_maxs.append(local_max)
         else:
@@ -162,8 +167,8 @@ class LinearBrightnessScale(ImgProc):
         self._pan_min_value = np.min(self._pan_mins)
         self._pan_max_value = np.max(self._pan_maxs)
         if self._per_channel:
-            self._ms_min_vector = np.min(self._ms_mins, axis=0)
-            self._ms_min_vector = np.max(self._ms_maxs, axis=0)
+            self._ms_min_value = np.min(self._ms_mins, axis=0)
+            self._ms_max_value = np.max(self._ms_maxs, axis=0)
         else:
             self._ms_min_value = np.min(self._ms_mins)
             self._ms_max_value = np.max(self._ms_maxs)
@@ -188,20 +193,22 @@ class LinearBrightnessScale(ImgProc):
 
     # ======================= Meanstd method ======================== #
     # Find maximum and minimum as mean +- N*std
-    def _meanstdme(self, img, axis=None):
-        mean = img.mean(axis)
-        std = img.std(axis)
+    @staticmethod
+    def _meanstdme(img):
+        mean = img.mean()
+        std = img.std()
         num = img.size
-        me = (img - mean).sum(axis) / num
+        me = (img - mean).sum() / num
 
         return mean, std, num, me
 
-    def _totalmeanstd(self, means, stds, nums, mes):
+    @staticmethod
+    def _totalmeanstd(means, stds, nums, mes, per_channel=False):
         mean = np.sum([m*n for m,n in zip(means, nums)])/np.sum(nums)
-        # TODO: test it
-        std =sqrt(np.sum(
-            [(nums[i]/np.sum(nums)*(stds[i]**2 + nums[i]*(mean - means[i])**2 + 2*(means[i] - mean)*mes[i]))
-               for i in range(len(means))]))
+        # Calculation of the stddev from the window statistics
+        std = sqrt(np.sum(
+              [(nums[i]*(stds[i]**2 + (mean - means[i])**2 + 2*(means[i] - mean)*mes[i]))
+               for i in range(len(means))])/np.sum(nums))
         return mean, std
 
     def _meanstd_from_patch(self, pan, ms):
@@ -210,7 +217,7 @@ class LinearBrightnessScale(ImgProc):
         self._minmax_from_patch(pan, ms)
 
         if not self._pan_separate:
-            mean, std, num, me = self._meanstdme(np.concatenate(ms, pan, axis=0))
+            mean, std, num, me = self._meanstdme(np.concatenate([ms, np.expand_dims(pan,0)], axis=0))
             self._pan_means.append(mean)
             self._pan_stds.append(std)
             self._pan_nums.append(num)
@@ -227,12 +234,27 @@ class LinearBrightnessScale(ImgProc):
             self._pan_mes.append(me)
             self._pan_nums.append(num)
 
-            axis = 1 if self._per_channel else None
-            mean, std, num, me = self._meanstdme(ms, axis=axis)
-            self._ms_means.append(mean)
-            self._ms_stds.append(std)
-            self._ms_mes.append(me)
-            self._ms_nums.append(num)
+            if self._per_channel:
+                means = []
+                stds = []
+                nums = []
+                mes = []
+                for ch in ms:
+                    mean, std, num, me = self._meanstdme(ch)
+                    means.append(mean)
+                    stds.append(std)
+                    nums.append(num)
+                    mes.append(me)
+                self._ms_means.append(np.array(means))
+                self._ms_stds.append(np.array(stds))
+                self._ms_mes.append(np.array(mes))
+                self._ms_nums.append(np.array(nums))
+            else:
+                mean, std, num, me = self._meanstdme(ms)
+                self._ms_means.append(mean)
+                self._ms_stds.append(std)
+                self._ms_mes.append(me)
+                self._ms_nums.append(num)
 
     def _finalize_meanstd(self):
         # We need all the statistics to be calculated for every patch in the same order, so we check the length
@@ -241,14 +263,24 @@ class LinearBrightnessScale(ImgProc):
         if len(patches_num)!= 1:
             raise ValueError('Some of the patches staticstics were not calculated correcty, '
                              'and the length of the patch statistics arrays are different')
-        ms_mean, ms_std = self._totalmeanstd(self._ms_means, self._ms_stds, self._ms_nums, self._ms_mes)
-        pan_mean, pan_std = self._totalmeanstd(self._pan_means, self._pan_stds, self._pan_nums, self._pan_mes)
         # We find the actual min and max of images
         self._finalize_minmax()
+        if self._per_channel:
+            ms_mean = np.zeros_like(self._ms_means[0])
+            ms_std = np.zeros_like(self._ms_stds[0])
+            for ch in range(ms_mean.shape[0]):
+                ms_mean[ch], ms_std[ch] = self._totalmeanstd(np.array(self._ms_means)[:,ch],
+                                                             np.array(self._ms_stds)[:,ch],
+                                                             np.array(self._ms_nums)[:,ch],
+                                                             np.array(self._ms_mes)[:,ch])
+        else:
+            ms_mean, ms_std = self._totalmeanstd(self._ms_means, self._ms_stds, self._ms_nums, self._ms_mes)
+        pan_mean, pan_std = self._totalmeanstd(self._pan_means, self._pan_stds, self._pan_nums, self._pan_mes)
 
         # Then we make the min higher and the max lower if it is necessary
         # Maybe not use minmax, and just clip to the value range?
-        axis = 1 if self._per_channel else None
+
+        axis = 0 if self._per_channel else None
         self._pan_min_value = max(pan_mean - self._std_width * pan_std, self._pan_min_value)
         self._ms_min_value = np.max([ms_mean - self._std_width * ms_std, self._ms_min_value], axis=axis)
         self._pan_max_value = min(pan_mean + self._std_width * pan_std, self._pan_max_value)

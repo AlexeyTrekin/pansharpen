@@ -20,8 +20,8 @@ class Worker:
         self.methods = methods
 
         # bound is specified by the methods
-        self.bound = np.max([m.bound for m in self.methods])
-
+        self.setup_bound = np.max([m.setup_bound for m in self.methods])
+        self.processing_bound = np.max([m.processing_bound for m in self.methods])
         # all the functions of the methods are bound into a single processing function to calculate in a single pass
         def processing_fn(collection):
             if collection.count > 1:
@@ -38,7 +38,7 @@ class Worker:
 
     def setup_methods(self, bc, channels):
 
-        sampler = ds.io.SequentialSampler(bc, channels, sample_size=self.window_size, bound=self.bound)
+        sampler = ds.io.SequentialSampler(bc, channels, sample_size=self.window_size, bound=self.setup_bound)
         # Apply different bound for different calculations to avoid errors
         # At the moment, the bound is maximum of all methods' working bounds
         # Also maybe different bounds for setup and processing
@@ -56,9 +56,9 @@ class Worker:
                 if m.setup_required:
                     # The excessive boundary can affect the statistics of the image, so we cut the input for each method
                     # according to their minimum necessary bound
-                    cut = self.bound - m.processing_bound
-                    m.setup_from_patch(pan[cut: -cut, cut: -cut],
-                                       ms[:, cut:-cut, cut:-cut])
+                    cut = self.setup_bound - m.processing_bound
+                    m.setup_from_patch(pan[cut: pan.shape[0]-cut, cut: pan.shape[1]-cut],
+                                       ms[:, cut:ms.shape[1]-cut, cut:ms.shape[2]-cut])
 
         for m in self.methods:
             if m.setup_required:
@@ -70,7 +70,7 @@ class Worker:
         else:
             dtype = bc[-1].dtype
         return ds.Predictor(channels, output_labels, self.processing_fn,
-                            sample_size=self.window_size, bound=self.bound,
+                            sample_size=self.window_size, bound=self.processing_bound,
                             verbose=verbose, dtype=dtype)\
             .process(bc, output_dir)
 
