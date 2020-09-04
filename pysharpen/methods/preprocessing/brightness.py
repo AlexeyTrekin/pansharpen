@@ -203,7 +203,7 @@ class LinearBrightnessScale(ImgProc):
         return mean, std, num, me
 
     @staticmethod
-    def _totalmeanstd(means, stds, nums, mes, per_channel=False):
+    def _totalmeanstd(means, stds, nums, mes):
         mean = np.sum([m*n for m,n in zip(means, nums)])/np.sum(nums)
         # Calculation of the stddev from the window statistics
         std = sqrt(np.sum(
@@ -217,7 +217,7 @@ class LinearBrightnessScale(ImgProc):
         self._minmax_from_patch(pan, ms)
 
         if not self._pan_separate:
-            mean, std, num, me = self._meanstdme(np.concatenate([ms, np.expand_dims(pan,0)], axis=0))
+            mean, std, num, me = self._meanstdme(np.concatenate([ms, np.expand_dims(pan, 0)], axis=0))
             self._pan_means.append(mean)
             self._pan_stds.append(std)
             self._pan_nums.append(num)
