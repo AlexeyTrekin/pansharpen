@@ -26,6 +26,8 @@ def wider_type(dtype):
     """
     Returns the dtype which can handle arithmetic with the specified dtype without overflow.
     However, for the multiplication/division it is more convenient to cast to float32 in any case
+
+    # TODO: decide whether we need or np.result_type is enough
     :param dtype: numpy data type or its string representation
     :return:
     """
@@ -46,6 +48,6 @@ def saturate_cast(img, dtype):
     :return: new image of dtype
     """
     if np.issubdtype(dtype, np.integer):
-        return np.clip(img, np.iinfo(dtype).min, np.iinfo(dtype).max).astype(dtype)
+        return np.clip(np.around(img,0), np.iinfo(dtype).min, np.iinfo(dtype).max).astype(dtype)
     else:
         return img.astype(dtype)
