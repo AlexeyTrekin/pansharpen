@@ -21,10 +21,8 @@ By the moment, only the very basic methods are supported:
 
 ## Preprocessing methods:
 1. Linear brightness scaling allowes to stretch the brightness to the whole range of the data format or fit to 8bit
-The initial values range can be defined in the following variants:
-    a. min - max
-    b. mean +- WIDTH*std
-    
+The initial values range can be defined in the following variants: min - max, mean +- WIDTH*std
+
 ## Adding your own method:
 You can inherit ImgProc class, implementing process() function to add any preprocessing, pansharpening or postprocessing 
 function you need.

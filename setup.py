@@ -9,7 +9,7 @@ import os
 import sys
 from shutil import rmtree
 
-from setuptools import find_packages, setup, Command
+from setuptools import find_packages, setup, Command, Extension
 
 # Package meta-data.
 NAME = 'pysharpen'
@@ -43,7 +43,7 @@ EXTRAS = {
 # Note: this will only work if 'README.md' is present in your MANIFEST.in file!
 try:
     with io.open(os.path.join(here, 'README.md'), encoding='utf-8') as f:
-        long_description = '\n' + f.read()
+        long_description = f.read()
 except FileNotFoundError:
     long_description = DESCRIPTION
 
