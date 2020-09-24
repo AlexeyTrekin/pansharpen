@@ -1,16 +1,20 @@
-
 import numpy as np
-from .pansharp import Pansharp
-from pysharpen.preprocessing.type_conversion import saturate_cast
+from pysharpen.methods.img_proc import ImgProc
+from pysharpen.functional import saturate_cast
 
 
-class Brovey(Pansharp):
+class BroveyPansharpening(ImgProc):
+    """
+    Brovey transform for pansharpening.
+    Formula for the output is: MSpan[i] = MS[i] * pan / mean (MS)
+    Mean is weighted, default weights are equal.
+    """
 
     def __init__(self, weights=None):
         """
         :param weights:
         """
-
+        super().__init__()
         self.weights = None
 
         if weights is not None:
@@ -19,12 +23,12 @@ class Brovey(Pansharp):
             self.weights = weights / sum(weights)
         else:
             self.weights = 1
-        Pansharp.__init__(self)
+        self.setup_required = False
 
     def _calculate_ratio(self, pan, ms):
         return pan / (np.sum(ms * self.weights, 0))
 
-    def sharpen(self, pan, ms):
+    def process(self, pan, ms):
         ratio = self._calculate_ratio(pan, ms)
         res = ratio * ms
-        return saturate_cast(res, ms.dtype)
+        return pan, saturate_cast(res, ms.dtype)
