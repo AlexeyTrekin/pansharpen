@@ -1,4 +1,3 @@
-from .brovey import Brovey
-from .ihs import IHS
-from .gihs import GIHS
-from .pansharp import Pansharp
+from pysharpen.methods.sharpening import BroveyPansharpening, IHSPansharpening, GIHSPansharpening
+from .preprocessing import LinearBrightnessScale
+from .img_proc import ImgProc
