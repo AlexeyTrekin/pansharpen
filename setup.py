@@ -109,7 +109,7 @@ setup(
     # py_modules=['mypackage'],
 
     entry_points={
-         'console_scripts': ['pysharpen=pysharpen.pysharpen:run_cli'],
+         'console_scripts': ['pysharpen=pysharpen.pysharpen:command'],
      },
     test_suite='tests.test',
     install_requires=REQUIRED,

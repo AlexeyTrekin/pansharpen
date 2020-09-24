@@ -135,6 +135,7 @@ class Worker:
         if channels is None:
             channels = ['B' + str(i+1).zfill(2) for i in range(ms_profile['count'])]
         mul_bands = split(ms_file, folder, channels)
+
         output_labels = ['P' + channel for channel in channels]
 
         all_bands = ds.BandCollection([b.reproject_to(pan_band, interpolation=self.resampling) for b in mul_bands]
@@ -143,14 +144,13 @@ class Worker:
         self.setup_methods(all_bands, channels + [pan_band.name])
         out_bc = self.process(all_bands, channels + [pan_band.name], output_labels, folder)
 
-        pan_profile.update(count=ms_profile['count'])
-        
+        pan_profile.update(count=ms_profile['count'], dtype=out_bc[0].dtype)
+
         # We want to merge the channels back into one file as it was
         # It requires reading full files, so it's not memory-efficient
         # However, just the read-write operations will not consume more than the image size
         with rasterio.open(out_file, 'w', **pan_profile) as dst:
             for band_num, band in enumerate(out_bc):
-                print(band.numpy().shape)
                 dst.write(band.numpy(), band_num + 1)
 
         if clean:

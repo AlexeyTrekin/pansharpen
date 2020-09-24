@@ -23,13 +23,12 @@ class BroveyPansharpening(ImgProc):
             self.weights = weights / sum(weights)
         else:
             self.weights = 1
-
-    # this methods does not need setup
+        self.setup_required = False
 
     def _calculate_ratio(self, pan, ms):
         return pan / (np.sum(ms * self.weights, 0))
 
-    def sharpen(self, pan, ms):
+    def process(self, pan, ms):
         ratio = self._calculate_ratio(pan, ms)
         res = ratio * ms
         return pan, saturate_cast(res, ms.dtype)
