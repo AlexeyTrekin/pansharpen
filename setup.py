@@ -40,9 +40,9 @@ EXTRAS = {
 }
 
 # Import the README and use it as the long-description.
-# Note: this will only work if 'README.md' is present in your MANIFEST.in file!
+# Note: this will only work if 'README.rst' is present in your MANIFEST.in file!
 try:
-    with io.open(os.path.join(here, 'README.md'), encoding='utf-8') as f:
+    with io.open(os.path.join(here, 'README.rst'), encoding='utf-8') as f:
         long_description = f.read()
 except FileNotFoundError:
     long_description = DESCRIPTION
