@@ -124,7 +124,7 @@ class Worker:
 
         """
 
-        folder = os.path.dirname(ms_file)
+        folder = os.path.dirname(os.path.abspath(ms_file))
         pan_band = ds.Band(pan_file)
 
         with rasterio.open(ms_file) as src:
