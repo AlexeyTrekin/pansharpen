@@ -1,5 +1,2 @@
-opencv-python
-numpy >= 1.10
-rasterio>=1.0.0
 aeronet>=0.0.8
 click>=6.7
