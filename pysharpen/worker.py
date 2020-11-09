@@ -102,11 +102,18 @@ class Worker:
         pan_band = ds.Band(ds.parse_directory(input_dir, [pan_channel], extensions)[0])
         mul_bands = ds.BandCollection(ds.parse_directory(input_dir, mul_channels, extensions))
 
-        all_bands = ds.BandCollection([b.reproject_to(pan_band, interpolation=self.resampling) for b in mul_bands]
-                                      + [pan_band])
+        tmp_names = [os.path.join(input_dir, 'resampled_' + channel + '.tif') for channel in mul_channels]
+        tmp_bands = [b.reproject_to(pan_band,
+                                    fp=tmp_name,  # We manage the temp files by hand
+                                    interpolation=self.resampling) for b, tmp_name in zip(mul_bands, tmp_names)]
 
-        self.setup_methods(all_bands, mul_channels + [pan_channel], verbose)
+        all_bands = ds.BandCollection(tmp_bands + [pan_band])
+
+        self.setup_methods(all_bands, mul_channels + [pan_channel])
         self.process(all_bands, mul_channels + [pan_channel], output_labels, output_dir, verbose)
+        # remove temp files
+        for band in tmp_bands:
+            band._tmp_file = True
 
     def process_single(self, pan_file, ms_file, out_file, channels=None, clean=True, verbose=False):
         """
@@ -137,9 +144,12 @@ class Worker:
         mul_bands = split(ms_file, folder, channels)
 
         output_labels = ['P' + channel for channel in channels]
+        tmp_names = [os.path.join(folder, 'resampled_' + channel + '.tif') for channel in channels]
+        tmp_bands = [b.reproject_to(pan_band,
+                                    fp=tmp_name, # We manage the temp files by hand
+                                     interpolation=self.resampling) for b, tmp_name in zip(mul_bands, tmp_names)]
 
-        all_bands = ds.BandCollection([b.reproject_to(pan_band, interpolation=self.resampling) for b in mul_bands]
-                                      + [pan_band])
+        all_bands = ds.BandCollection(tmp_bands + [pan_band])
 
         self.setup_methods(all_bands, channels + [pan_band.name])
         out_bc = self.process(all_bands, channels + [pan_band.name], output_labels, folder)
@@ -154,6 +164,8 @@ class Worker:
                 dst.write(band.numpy(), band_num + 1)
 
         if clean:
-            for band, pband in zip(mul_bands, out_bc):
-                os.remove(band._band.name)
-                os.remove(pband._band.name)
+            # Mark the files for removal
+            for band, pband, tmp_band in zip(mul_bands, out_bc, tmp_bands):
+                band._tmp_file = True
+                pband._tmp_file = True
+                tmp_band._tmp_file = True
