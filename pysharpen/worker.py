@@ -2,13 +2,16 @@ import os
 import rasterio
 import numpy as np
 import aeronet.dataset as ds
-from numpy.ma import MaskedArray
+
 from typing import List
+from tqdm import tqdm
 from aeronet.converters.split import split
 from pysharpen.methods import ImgProc
+from rasterio.windows import Window
 
 
 class Worker:
+
     def __init__(self, methods: List[ImgProc],
                  window_size=(2048, 2048),
                  resampling='bilinear', out_dtype=None):
@@ -36,14 +39,14 @@ class Worker:
             return ms
         self.processing_fn = processing_fn
 
-    def setup_methods(self, bc, channels):
+    def setup_methods(self, bc, channels, verbose=False):
 
         sampler = ds.io.SequentialSampler(bc, channels, sample_size=self.window_size, bound=self.setup_bound)
         # Apply different bound for different calculations to avoid errors
         # At the moment, the bound is maximum of all methods' working bounds
         # Also maybe different bounds for setup and processing
 
-        for sample, block in sampler:
+        for sample, block in tqdm(sampler, disable=not verbose):
             img = sample.numpy()
             ms = img[:-1]
             pan = img[-1]
@@ -103,13 +106,19 @@ class Worker:
         mul_bands = ds.BandCollection(ds.parse_directory(input_dir, mul_channels, extensions))
 
         tmp_names = [os.path.join(input_dir, 'resampled_' + channel + '.tif') for channel in mul_channels]
+        if verbose:
+            print('Reprojection of the multispectral bands to the size of the panchromatic band')
         tmp_bands = [b.reproject_to(pan_band,
                                     fp=tmp_name,  # We manage the temp files by hand
-                                    interpolation=self.resampling) for b, tmp_name in zip(mul_bands, tmp_names)]
+                                    interpolation=self.resampling) for b, tmp_name in tqdm(zip(mul_bands, tmp_names),
+                                                                                           disable=not verbose)]
 
         all_bands = ds.BandCollection(tmp_bands + [pan_band])
-
-        self.setup_methods(all_bands, mul_channels + [pan_channel])
+        if verbose:
+            print('Methods setup in progress')
+        self.setup_methods(all_bands, mul_channels + [pan_channel], verbose=verbose)
+        if verbose:
+            print('Processing in progress')
         self.process(all_bands, mul_channels + [pan_channel], output_labels, output_dir, verbose)
         # remove temp files
         for band in tmp_bands:
@@ -126,7 +135,7 @@ class Worker:
             out_file:
             channels: names for the channels of ms file to split. If None, the names are generated
             clean: if True, all separate band files (both source and pansharpened) are deleted
-
+            verbose: if True, print the
         Returns:
 
         """
@@ -145,25 +154,41 @@ class Worker:
 
         output_labels = ['P' + channel for channel in channels]
         tmp_names = [os.path.join(folder, 'resampled_' + channel + '.tif') for channel in channels]
+        if verbose:
+            print('Reprojection of the multispectral bands to the size of the panchromatic band')
         tmp_bands = [b.reproject_to(pan_band,
                                     fp=tmp_name, # We manage the temp files by hand
-                                     interpolation=self.resampling) for b, tmp_name in zip(mul_bands, tmp_names)]
+                                     interpolation=self.resampling) for b, tmp_name in tqdm(zip(mul_bands, tmp_names),
+                                                                                            disable=not verbose)]
 
         all_bands = ds.BandCollection(tmp_bands + [pan_band])
+        if verbose:
+            print('Methods setup in progress')
+        self.setup_methods(all_bands, channels + [pan_band.name], verbose=verbose)
+        if verbose:
+            print('Processing in progress')
+        out_bc = self.process(all_bands, channels + [pan_band.name], output_labels, folder, verbose=verbose)
 
-        self.setup_methods(all_bands, channels + [pan_band.name])
-        out_bc = self.process(all_bands, channels + [pan_band.name], output_labels, folder)
-
-        pan_profile.update(count=ms_profile['count'], dtype=out_bc[0].dtype)
+        pan_profile.update(count=ms_profile['count'], dtype=out_bc[0].dtype, BIGTIFF='IF_SAFER')
 
         # We want to merge the channels back into one file as it was
         # It requires reading full files, so it's not memory-efficient
         # However, just the read-write operations will not consume more than the image size
+        if verbose:
+            print('Processing is completed, stacking the output channels to a single file')
+        sampler = ds.io.SequentialSampler(out_bc, output_labels, self.window_size)
         with rasterio.open(out_file, 'w', **pan_profile) as dst:
-            for band_num, band in enumerate(out_bc):
-                dst.write(band.numpy(), band_num + 1)
+            w = dst.width
+            h = dst.height
+            for sample, block in tqdm(sampler, disable=not verbose):
+                window = Window(block['x'], block['y'],
+                                min(block['width'], w - block['x']),
+                                min(block['height'], h - block['y']))
+                dst.write(sample.numpy(), window=window)
 
         if clean:
+            if verbose:
+                print('Cleaning the intermediate files')
             # Mark the files for removal
             for band, pband, tmp_band in zip(mul_bands, out_bc, tmp_bands):
                 band._tmp_file = True
