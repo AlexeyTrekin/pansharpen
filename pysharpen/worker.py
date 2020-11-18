@@ -39,6 +39,24 @@ class Worker:
             return ms
         self.processing_fn = processing_fn
 
+    @staticmethod
+    def _merge_channels(bc, out_file, window_size=(2048, 2048), labels=None, verbose=False, **kwargs):
+        if labels is None:
+            labels = [b.name for b in bc]
+        sampler = ds.io.SequentialSampler(bc, labels, window_size, bound=0)
+        with rasterio.open(out_file, 'w', **kwargs) as dst:
+            w = dst.width
+            h = dst.height
+            for sample, block in tqdm(sampler, disable=not verbose):
+
+                window = Window(block['x'], block['y'],
+                                min(block['width'], w - block['x']),
+                                min(block['height'], h - block['y']))
+
+                dst.write(sample.sample(0,0,
+                                        min(block['height'], h - block['y']),
+                                        min(block['width'], w - block['x'])).numpy(), window=window)
+
     def setup_methods(self, bc, channels, verbose=False):
 
         sampler = ds.io.SequentialSampler(bc, channels, sample_size=self.window_size, bound=self.setup_bound)
@@ -176,15 +194,7 @@ class Worker:
         # However, just the read-write operations will not consume more than the image size
         if verbose:
             print('Processing is completed, stacking the output channels to a single file')
-        sampler = ds.io.SequentialSampler(out_bc, output_labels, self.window_size)
-        with rasterio.open(out_file, 'w', **pan_profile) as dst:
-            w = dst.width
-            h = dst.height
-            for sample, block in tqdm(sampler, disable=not verbose):
-                window = Window(block['x'], block['y'],
-                                min(block['width'], w - block['x']),
-                                min(block['height'], h - block['y']))
-                dst.write(sample.numpy(), window=window)
+        self._merge_channels(out_bc, out_file, self.window_size, labels=output_labels, verbose=verbose, **pan_profile)
 
         if clean:
             if verbose:
