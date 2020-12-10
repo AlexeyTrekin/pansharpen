@@ -40,8 +40,8 @@ class LinearBrightnessScale(ImgProc):
         # if ms is scaled per-channel, we cannot scale pan together with all the channels
         self._pan_separate = pan_separate or per_channel
         # Valid only for method = 'meanstd'
-        if type(std_width) not in (int, float) or std_width <=0:
-            self._std_width=std_width
+        if type(std_width) not in (int, float) or std_width <= 0:
+            self._std_width = std_width
             raise ValueError('Only positive std_width is allowed, otherwise the values of min and max are undefined')
         self._std_width = std_width
         # Valid only for method = 'histogram'
@@ -54,7 +54,7 @@ class LinearBrightnessScale(ImgProc):
         self._pan_min_value = 0
         self._pan_max_value = 1
         self._ms_min_value = [] if self._per_channel else 0
-        self._ms_min_value = [] if self._per_channel else 1
+        self._ms_max_value = [] if self._per_channel else 1
 
         self._ms_mean_value = [] if self._per_channel else 0
         self._ms_std_value = [] if self._per_channel else 0
@@ -90,7 +90,7 @@ class LinearBrightnessScale(ImgProc):
                f'process_pan: {self._process_pan}, process_ms: {self._process_ms})'
         if self._method == 'meanstd':
             repr = repr + f', width: {self._std_width}'
-        elif self._method == 'historgam':
+        elif self._method == 'histogram':
             repr = repr + f', {self._hist_cut}'
 
         return repr
@@ -101,7 +101,8 @@ class LinearBrightnessScale(ImgProc):
             self._minmax_from_patch(pan, ms)
         elif self._method == 'meanstd':
             self._meanstd_from_patch(pan, ms)
-        elif self._method == 'historgam':
+        elif self._method == 'histogram':
+
             self._histogram_from_patch(pan, ms)
         else:
             raise ValueError(f'Unknown method {self._method}')
@@ -114,7 +115,7 @@ class LinearBrightnessScale(ImgProc):
             self._finalize_minmax()
         elif self._method == 'meanstd':
             self._finalize_meanstd()
-        elif self._method == 'historgam':
+        elif self._method == 'histogram':
             self._finalize_histogram()
         else:
             raise ValueError(f'Unknown method {self._method}')
@@ -135,19 +136,19 @@ class LinearBrightnessScale(ImgProc):
 
         if self._process_pan:
             pan_res = linear_brightness_scale(pan,
-                                          self._pan_min_value, self._pan_max_value,
-                                          dtype=dtype)
+                                              self._pan_min_value, self._pan_max_value,
+                                              dtype=dtype)
         if self._process_ms:
             if self._per_channel:
                 ms_res = np.zeros(shape=ms.shape, dtype=dtype)
                 for channel in range(ms.shape[0]):
                     ms_res[channel] = linear_brightness_scale(ms[channel],
-                                                          self._ms_min_value[channel], self._ms_max_value[channel],
-                                                          dtype=dtype)
+                                                              self._ms_min_value[channel], self._ms_max_value[channel],
+                                                              dtype=dtype)
             else:
                 ms_res = linear_brightness_scale(ms,
-                                             self._ms_min_value, self._ms_max_value,
-                                             dtype=dtype)
+                                                 self._ms_min_value, self._ms_max_value,
+                                                 dtype=dtype)
         return pan_res, ms_res
 
     # =========================== Private functions: methods of setup ======================= #
@@ -201,14 +202,13 @@ class LinearBrightnessScale(ImgProc):
         self._ms_mins = []
         self._ms_maxs = []
 
-
     # ================== Histogram method ========================= #
     # Find minimum and maximum from histogram
     def _histogram_from_patch(self, pan, ms):
-        return
+        raise NotImplementedError('Histogram method is not implemented yet')
 
     def _finalize_histogram(self):
-        return
+        raise NotImplementedError('Histogram method is not implemented yet')
 
     # ======================= Meanstd method ======================== #
     # Find maximum and minimum as mean +- N*std
@@ -223,11 +223,11 @@ class LinearBrightnessScale(ImgProc):
 
     @staticmethod
     def _totalmeanstd(means, stds, nums, mes):
-        mean = np.sum([m*n for m,n in zip(means, nums)])/np.sum(nums)
+        mean = np.sum([m * n for m, n in zip(means, nums)]) / np.sum(nums)
         # Calculation of the stddev from the window statistics
         std = sqrt(np.sum(
-              [(nums[i]*(stds[i]**2 + (mean - means[i])**2 + 2*(means[i] - mean)*mes[i]))
-               for i in range(len(means))])/np.sum(nums))
+            [(nums[i] * (stds[i] ** 2 + (mean - means[i]) ** 2 + 2 * (means[i] - mean) * mes[i]))
+             for i in range(len(means))]) / np.sum(nums))
         return mean, std
 
     def _meanstd_from_patch(self, pan, ms):
@@ -278,7 +278,7 @@ class LinearBrightnessScale(ImgProc):
     def _finalize_meanstd(self):
         # We need all the statistics to be calculated for every patch in the same order, so we check the length
         patches_num = set(len(stat) for stat in [self._ms_means, self._ms_stds, self._ms_nums, self._ms_mes,
-                      self._pan_means, self._pan_stds, self._pan_nums, self._pan_mes])
+                                                 self._pan_means, self._pan_stds, self._pan_nums, self._pan_mes])
         if len(patches_num) != 1:
             raise ValueError('Some of the patches staticstics were not calculated correcty, '
                              'and the length of the patch statistics arrays are different')
@@ -290,10 +290,10 @@ class LinearBrightnessScale(ImgProc):
             ms_mean = np.zeros_like(self._ms_means[0])
             ms_std = np.zeros_like(self._ms_stds[0])
             for ch in range(ms_mean.shape[0]):
-                ms_mean[ch], ms_std[ch] = self._totalmeanstd(np.array(self._ms_means)[:,ch],
-                                                             np.array(self._ms_stds)[:,ch],
-                                                             np.array(self._ms_nums)[:,ch],
-                                                             np.array(self._ms_mes)[:,ch])
+                ms_mean[ch], ms_std[ch] = self._totalmeanstd(np.array(self._ms_means)[:, ch],
+                                                             np.array(self._ms_stds)[:, ch],
+                                                             np.array(self._ms_nums)[:, ch],
+                                                             np.array(self._ms_mes)[:, ch])
 
         else:
             ms_mean, ms_std = self._totalmeanstd(self._ms_means, self._ms_stds, self._ms_nums, self._ms_mes)
@@ -332,5 +332,3 @@ class LinearBrightnessScale(ImgProc):
         self._ms_stds = []
         self._ms_nums = []
         self._ms_mes = []
-
-

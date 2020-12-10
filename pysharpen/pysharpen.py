@@ -4,12 +4,13 @@ import rasterio
 import warnings
 
 from .worker import Worker
-from pysharpen.methods import BroveyPansharpening, IHSPansharpening, GIHSPansharpening, LinearBrightnessScale
-from pysharpen.functional import saturate_cast
+from .methods import BroveyPansharpening, IHSPansharpening, GIHSPansharpening, LinearBrightnessScale
+from .functional import saturate_cast
 
 METHODS= {'ihs' : IHSPansharpening,
           'gihs': GIHSPansharpening,
           'brovey': BroveyPansharpening}
+
 PREPROCESSINGS = ['minmax', 'meanstd', 'none']
 
 

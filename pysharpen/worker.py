@@ -1,7 +1,8 @@
-import os
 import rasterio
 import numpy as np
 import aeronet.dataset as ds
+
+from pathlib import Path
 
 from typing import List
 from tqdm import tqdm
@@ -90,40 +91,41 @@ class Worker:
             dtype = self.out_dtype
         else:
             dtype = bc[-1].dtype
+
         return ds.Predictor(channels, output_labels, self.processing_fn,
                             sample_size=self.window_size, bound=self.processing_bound,
                             verbose=verbose, dtype=dtype)\
             .process(bc, output_dir)
 
-    def process_separate(self, input_dir,  mul_channels, pan_channel='PAN', output_dir=None, output_labels=None,
-                         extensions=('tif', 'tiff', 'TIF', 'TIFF'), verbose=False):
+    def process_separate(self, pan_file, mul_files: List,
+                         output_dir=None, output_labels=None, mul_out_file=None,
+                         verbose=False):
         """
         Processing of the bands represented as a set separate files, one for each band
         Args:
-            input_dir:
-            mul_channels:
-            pan_channel:
-            output_dir:
-            output_labels:
-            extensions:
-            verbose:
+            pan_file: path to panchromatic file
+            mul_files: paths to multispectral files (Paths or str)
+            output_dir: path to output directory all the results and intermediate data is stored here
+            output_labels: filenames without extensions to be saved to output_dir. If none, they will be generated
+            verbose: enable logging
 
         Returns:
-
         """
-
-        # We call pansharpened channel with 'P' prefix, like pansharpen RED is PRED
+        # We call pansharpened channel with 'P' prefix, like pansharpened RED is PRED
         # if they are not specified or with errors
-        if output_labels is None or len(output_labels) != len(mul_channels):
+
+        if output_labels is None or len(output_labels) != len(mul_files):
             if verbose:
                 print('Generating names for pansharpened channels')
-            output_labels = ['P' + channel for channel in mul_channels]
+            output_labels = ['P' + Path(channel).stem for channel in mul_files]
+
         # A single band collection is necessary for the Predictor
         # reproject_to provides geographic matching of pan and mul images
-        pan_band = ds.Band(ds.parse_directory(input_dir, [pan_channel], extensions)[0])
-        mul_bands = ds.BandCollection(ds.parse_directory(input_dir, mul_channels, extensions))
 
-        tmp_names = [os.path.join(input_dir, 'resampled_' + channel + '.tif') for channel in mul_channels]
+        pan_band = ds.Band(pan_file)
+        mul_bands = ds.BandCollection(mul_files)
+
+        tmp_names = [str(Path(output_dir)/('resampled_' + band.name + '.tif')) for band in mul_bands]
         if verbose:
             print('Reprojection of the multispectral bands to the size of the panchromatic band')
         tmp_bands = [b.reproject_to(pan_band,
@@ -134,15 +136,26 @@ class Worker:
         all_bands = ds.BandCollection(tmp_bands + [pan_band])
         if verbose:
             print('Methods setup in progress')
-        self.setup_methods(all_bands, mul_channels + [pan_channel], verbose=verbose)
+        self.setup_methods(all_bands, [b.name for b in all_bands], verbose=verbose)
         if verbose:
             print('Processing in progress')
-        self.process(all_bands, mul_channels + [pan_channel], output_labels, output_dir, verbose)
+        out_bc = self.process(all_bands, [b.name for b in all_bands], output_labels, output_dir, verbose)
+
+        # Merge channels together to have a single MS file
+        if mul_out_file:
+            with rasterio.open(pan_file) as src:
+                pan_profile = src.profile
+            pan_profile.update(count=len(out_bc), dtype=out_bc[0].dtype, BIGTIFF='IF_SAFER')
+            self._merge_channels(out_bc, mul_out_file, self.window_size,
+                                 labels=output_labels, verbose=verbose, **pan_profile)
+
         # remove temp files
         for band in tmp_bands:
             band._tmp_file = True
+        return out_bc
 
-    def process_single(self, pan_file, ms_file, out_file, channels=None, clean=True, verbose=False):
+    def process_single(self, pan_file, ms_file, out_file,
+                       channels=None, clean=True, verbose=False):
         """
         Processing of files where the MS image is in one file and Pan in another.
         It splits the MS file to a set of bands and then as in process_separate.
@@ -158,7 +171,7 @@ class Worker:
 
         """
 
-        folder = os.path.dirname(os.path.abspath(ms_file))
+        folder = Path(out_file).parent
         pan_band = ds.Band(pan_file)
 
         with rasterio.open(ms_file) as src:
@@ -171,7 +184,7 @@ class Worker:
         mul_bands = split(ms_file, folder, channels)
 
         output_labels = ['P' + channel for channel in channels]
-        tmp_names = [os.path.join(folder, 'resampled_' + channel + '.tif') for channel in channels]
+        tmp_names = [str(folder/('resampled_' + channel + '.tif')) for channel in channels]
         if verbose:
             print('Reprojection of the multispectral bands to the size of the panchromatic band')
         tmp_bands = [b.reproject_to(pan_band,
