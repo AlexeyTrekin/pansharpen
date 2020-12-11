@@ -25,7 +25,7 @@ class GIHSPansharpening(ImgProc):
         ms = ms.transpose(1, 2, 0)
 
         ms_pansharpened = ms.astype(wider_type(pan.dtype))
-        mean = np.expand_dims(np.sum(ms_pansharpened, axis=2) / ms_pansharpened.shape[0], 2)
+        mean = np.expand_dims(np.sum(ms_pansharpened, axis=2) / ms_pansharpened.shape[-1], 2)
         ms_pansharpened = ms_pansharpened + np.expand_dims(pan.astype(wider_type(ms.dtype)), 2) - mean
 
         ms_pansharpened = saturate_cast(ms_pansharpened, ms.dtype)
