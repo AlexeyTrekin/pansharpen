@@ -15,13 +15,15 @@ class Worker:
 
     def __init__(self, methods: List[ImgProc],
                  window_size=(2048, 2048),
-                 resampling='bilinear', out_dtype=None):
+                 resampling='bilinear', out_dtype=None,
+                 n_workers=1):
 
         self.out_dtype = out_dtype
         self.window_size = window_size
         self.resampling = resampling
         # methods have to be initialized
         self.methods = methods
+        self.n_workers = n_workers
 
         # bound is specified by the methods
         self.setup_bound = np.max([m.setup_bound for m in self.methods])
@@ -54,7 +56,7 @@ class Worker:
                                 min(block['width'], w - block['x']),
                                 min(block['height'], h - block['y']))
 
-                dst.write(sample.sample(0,0,
+                dst.write(sample.sample(0, 0,
                                         min(block['height'], h - block['y']),
                                         min(block['width'], w - block['x'])).numpy(), window=window)
 
@@ -94,7 +96,7 @@ class Worker:
 
         return ds.Predictor(channels, output_labels, self.processing_fn,
                             sample_size=self.window_size, bound=self.processing_bound,
-                            verbose=verbose, dtype=dtype)\
+                            verbose=verbose, dtype=dtype, n_workers=self.n_workers)\
             .process(bc, output_dir)
 
     def process_separate(self, pan_file, mul_files: List,
