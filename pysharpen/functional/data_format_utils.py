@@ -3,7 +3,7 @@ from pathlib import  Path
 
 default_ext = '.tif'
 
-def extension_driver_consistency(cls, file_path, driver):
+def extension_driver_consistency(file_path, driver):
     file_path = Path(file_path)
 
 
