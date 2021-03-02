@@ -10,6 +10,7 @@ from aeronet.converters.split import split
 from pysharpen.methods import ImgProc
 from rasterio.windows import Window
 
+from .functional.data_format_utils import extension_driver_consistency
 
 class Worker:
 
@@ -47,6 +48,8 @@ class Worker:
         if labels is None:
             labels = [b.name for b in bc]
         sampler = ds.io.SequentialSampler(bc, labels, window_size, bound=0)
+
+        out_file, kwargs['driver'] = extension_driver_consistency(out_file, kwargs['driver'])
         with rasterio.open(out_file, 'w', **kwargs) as dst:
             w = dst.width
             h = dst.height
