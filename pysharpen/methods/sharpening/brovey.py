@@ -29,7 +29,10 @@ class BroveyPansharpening(ImgProc):
         self.setup_required = False
 
     def _calculate_ratio(self, pan, ms):
-        return pan / (np.mean(ms * self.weights, 0))
+        mean = np.mean(ms * self.weights, 0)
+        idx = mean > 0
+        out = np.zeros_like(mean.astype('float64'))
+        return np.divide(pan, mean, where=idx, out=out)
 
     def process(self, pan, ms):
         if self.count is not None and self.count != ms.shape[0]:
