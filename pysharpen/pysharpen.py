@@ -7,6 +7,8 @@ from .worker import Worker
 from .methods import BroveyPansharpening, IHSPansharpening, GIHSPansharpening, LinearBrightnessScale
 from .functional import saturate_cast
 
+from functional.data_format_utils import extension_driver_consistency
+
 METHODS= {'ihs' : IHSPansharpening,
           'gihs': GIHSPansharpening,
           'brovey': BroveyPansharpening}
@@ -47,6 +49,7 @@ def process_nogeo(pan_file, ms_file, out_file,
     for method in methods:
         pan_img, ms_img = method.process(pan_img, ms_img)
 
+    out_file, profile['driver'] = extension_driver_consistency(out_file, profile['driver'])
     with rasterio.open(out_file, 'w', **profile) as dst:
         dst.colorinterp = colorinterp
         dst.write(saturate_cast(ms_img, dtype))
