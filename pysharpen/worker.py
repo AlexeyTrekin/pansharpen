@@ -9,14 +9,14 @@ from tqdm import tqdm
 from aeronet.converters.split import split
 from pysharpen.methods import ImgProc
 from rasterio.windows import Window
-
+from aeronet.dataset import BandCollection
 
 class Worker:
 
     def __init__(self, methods: List[ImgProc],
                  window_size=(2048, 2048),
                  resampling='bilinear', out_dtype=None,
-                 n_workers=1):
+                 n_workers=1, out_channels = 'mul'):
 
         self.out_dtype = out_dtype
         self.window_size = window_size
@@ -24,6 +24,7 @@ class Worker:
         # methods have to be initialized
         self.methods = methods
         self.n_workers = n_workers
+        self.out_channels = out_channels
 
         # bound is specified by the methods
         self.setup_bound = np.max([m.setup_bound for m in self.methods])
@@ -39,7 +40,16 @@ class Worker:
                                  'with 2 or more channels where PAN channel is the last')
             for m in self.methods:
                 pan, ms = m.process(pan, ms)
-            return ms
+
+            if self.out_channels == 'mul':
+                return ms
+            elif self.out_channels == 'pan':
+                return pan[None]
+            elif self.out_channels == 'both':
+                return np.vstack((ms, pan[None]))
+            else:
+                raise ValueError("Wrong value for out_channels. Out_channels must be 'mul', 'pan' or 'both'.")
+
         self.processing_fn = processing_fn
 
     @staticmethod
@@ -116,7 +126,14 @@ class Worker:
         # We call pansharpened channel with 'P' prefix, like pansharpened RED is PRED
         # if they are not specified or with errors
 
-        if output_labels is None or len(output_labels) != len(mul_files):
+        if self.out_channels == 'mul':
+            n_out_channels = len(mul_files)
+        elif self.out_channels == 'pan':
+            n_out_channels = 1
+        elif self.out_channels == 'both':
+            n_out_channels = len(mul_files)+1
+
+        if output_labels is None or len(output_labels) != n_out_channels:
             if verbose:
                 print('Generating names for pansharpened channels')
             output_labels = ['P' + Path(channel).stem for channel in mul_files]
