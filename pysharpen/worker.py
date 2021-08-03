@@ -31,13 +31,13 @@ class Worker:
         self.processing_bound = np.max([m.processing_bound for m in self.methods])
         # all the functions of the methods are bound into a single processing function to calculate in a single pass
         def processing_fn(collection):
-            if collection.count > 1:
+            if collection.count > 0:
                 img = collection.numpy()
                 pan = img[-1]
                 ms = img[:-1]
             else:
                 raise ValueError('The samples inside the collection must be a list '
-                                 'with 2 or more channels where PAN channel is the last')
+                                 'with 1 or more channels where PAN channel is the last')
             for m in self.methods:
                 pan, ms = m.process(pan, ms)
 
