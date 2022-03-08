@@ -80,7 +80,7 @@ class Worker:
                 if m.setup_required:
                     # The excessive boundary can affect the statistics of the image, so we cut the input for each method
                     # according to their minimum necessary bound
-                    cut = self.setup_bound - m.processing_bound
+                    cut = self.setup_bound - m.setup_bound
                     m.setup_from_patch(pan[cut: pan.shape[0]-cut, cut: pan.shape[1]-cut],
                                        ms[:, cut:ms.shape[1]-cut, cut:ms.shape[2]-cut])
 
